@@ -1,0 +1,13 @@
+[package]
+name = "stellarator"
+version = "0.1.0"
+edition = "2021"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+strip = "symbols"
+
+[dependencies]
+clap = { version = "4.0.12", features = ["derive"] }
+nom = "7.1.1"
