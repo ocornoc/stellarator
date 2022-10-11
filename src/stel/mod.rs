@@ -1,4 +1,4 @@
-use nom::{IResult, bytes::complete::*};
+use nom::{IResult, Parser, bytes::complete::*};
 
 mod rle;
 
@@ -62,19 +62,22 @@ impl HumanMetadata {
         }))
     }
 
-    fn parse(bytes: &[u8]) -> IResult<&[u8], Self> {
-        let (mut bytes, mut human) = HumanMetadata::parse_name(bytes)?;
-        if let Ok((new_bytes, new_human)) = HumanMetadata::parse_description(bytes) {
+    fn parse_field(bytes: &[u8]) -> IResult<&[u8], Self> {
+        HumanMetadata::parse_name
+            .or(HumanMetadata::parse_description)
+            .or(HumanMetadata::parse_dual)
+            .or(HumanMetadata::parse_website_link)
+            .parse(bytes)
+    }
+
+    fn parse(mut bytes: &[u8]) -> IResult<&[u8], Self> {
+        let mut human = HumanMetadata::default();
+        while let Ok((new_bytes, new_human)) = HumanMetadata::parse_field(bytes) {
+            human.name = human.name.or(new_human.name);
+            human.description = human.description.or(new_human.description);
+            human.dual = human.dual.or(new_human.dual);
+            human.website_link = human.website_link.or(new_human.website_link);
             bytes = new_bytes;
-            human.description = new_human.description;
-        }
-        if let Ok((new_bytes, new_human)) = HumanMetadata::parse_dual(bytes) {
-            bytes = new_bytes;
-            human.dual = new_human.dual;
-        }
-        if let Ok((new_bytes, new_human)) = HumanMetadata::parse_website_link(bytes) {
-            bytes = new_bytes;
-            human.website_link = new_human.website_link;
         }
         Ok((bytes, human))
     }
