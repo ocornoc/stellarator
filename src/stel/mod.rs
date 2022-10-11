@@ -15,7 +15,7 @@ fn parse_c_str(bytes: &[u8]) -> IResult<&[u8], String> {
 pub struct HumanMetadata {
     pub name: Option<String>,
     pub description: Option<String>,
-    pub field3a: Option<String>,
+    pub dual: Option<String>,
     pub website_link: Option<String>,
 }
 
@@ -46,10 +46,10 @@ impl HumanMetadata {
         }))
     }
 
-    fn parse_field3a(bytes: &[u8]) -> IResult<&[u8], Self> {
-        let (bytes, field3a) = HumanMetadata::parse_tagged_string(&[0x3A, 0x00])(bytes)?;
+    fn parse_dual(bytes: &[u8]) -> IResult<&[u8], Self> {
+        let (bytes, dual) = HumanMetadata::parse_tagged_string(&[0x3A, 0x00])(bytes)?;
         Ok((bytes, HumanMetadata {
-            field3a: Some(field3a),
+            dual: Some(dual),
             ..Default::default()
         }))
     }
@@ -68,9 +68,9 @@ impl HumanMetadata {
             bytes = new_bytes;
             human.description = new_human.description;
         }
-        if let Ok((new_bytes, new_human)) = HumanMetadata::parse_field3a(bytes) {
+        if let Ok((new_bytes, new_human)) = HumanMetadata::parse_dual(bytes) {
             bytes = new_bytes;
-            human.field3a = new_human.field3a;
+            human.dual = new_human.dual;
         }
         if let Ok((new_bytes, new_human)) = HumanMetadata::parse_website_link(bytes) {
             bytes = new_bytes;
@@ -89,8 +89,8 @@ impl std::fmt::Display for HumanMetadata {
         if let Some(description) = self.description.as_ref() {
             writeln!(f, "Description: {description}")?;
         }
-        if let Some(field3a) = self.field3a.as_ref() {
-            writeln!(f, "Field 3A: {field3a}")?;
+        if let Some(dual) = self.dual.as_ref() {
+            writeln!(f, "Dual: {dual}")?;
         }
         if let Some(website_link) = self.website_link.as_ref() {
             writeln!(f, "Website link: {website_link}")?;
