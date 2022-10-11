@@ -11,68 +11,73 @@ fn parse_c_str(bytes: &[u8]) -> IResult<&[u8], String> {
     Ok((bytes, String::from_utf8_lossy(s).to_string()))
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Default)]
 pub struct HumanMetadata {
-    pub metadata: Vec<u8>,
     pub name: Option<String>,
     pub description: Option<String>,
+    pub website_link: Option<String>,
 }
 
 impl HumanMetadata {
-    fn parse_name_only(bytes: &[u8]) -> IResult<&[u8], Self> {
-        let (bytes, metadata) = tag(&[0x00])(bytes)?;
-        let (bytes, name) = parse_c_str(bytes)?;
-        Ok((bytes, HumanMetadata {
-            metadata: metadata.to_vec(),
-            name: if name.is_empty() {
-                None
-            } else {
-                Some(name)
-            },
-            description: None,
-        }))
-    }
-
-    fn parse_description_only(bytes: &[u8]) -> IResult<&[u8], Self> {
-        let (bytes, _) = tag(&[0x37, 0x00])(bytes)?;
-        let (bytes, description) = parse_c_str(bytes)?;
-        Ok((bytes, HumanMetadata {
-            metadata: Vec::new(),
-            name: None,
-            description: if description.is_empty() {
-                None
-            } else {
-                Some(description)
-            },
-        }))
-    }
-
-    fn parse_name_description(bytes: &[u8]) -> IResult<&[u8], Self> {
-        let (mut real_bytes, mut human) = HumanMetadata::parse_name_only(bytes)?;
-        if let Ok((bytes, human_desc)) = HumanMetadata::parse_description_only(bytes) {
-            real_bytes = bytes;
-            human.description = human_desc.description;
+    fn parse_tagged_string<'a>(
+        tag_bytes: &'a [u8],
+    ) -> impl Fn(&'a [u8]) -> IResult<&[u8], String> + 'a {
+        let tag = tag(tag_bytes);
+        move |bytes| {
+            let (bytes, _) = tag(bytes)?;
+            parse_c_str(bytes)
         }
-        Ok((real_bytes, human))
+    }
+
+    fn parse_name(bytes: &[u8]) -> IResult<&[u8], Self> {
+        let (bytes, name) = HumanMetadata::parse_tagged_string(&[0x33, 0x00])(bytes)?;
+        Ok((bytes, HumanMetadata {
+            name: Some(name),
+            ..Default::default()
+        }))
+    }
+
+    fn parse_description(bytes: &[u8]) -> IResult<&[u8], Self> {
+        let (bytes, description) = HumanMetadata::parse_tagged_string(&[0x37, 0x00])(bytes)?;
+        Ok((bytes, HumanMetadata {
+            description: Some(description),
+            ..Default::default()
+        }))
+    }
+
+    fn parse_website_link(bytes: &[u8]) -> IResult<&[u8], Self> {
+        let (bytes, website_link) = HumanMetadata::parse_tagged_string(&[0x8E, 0x00])(bytes)?;
+        Ok((bytes, HumanMetadata {
+            website_link: Some(website_link),
+            ..Default::default()
+        }))
     }
 
     fn parse(bytes: &[u8]) -> IResult<&[u8], Self> {
-        let (bytes, _) = tag(&[0x33])(bytes)?;
-        let (bytes, mut human) = HumanMetadata::parse_name_description(bytes)?;
-        human.metadata.insert(0, 0x33);
+        let (mut bytes, mut human) = HumanMetadata::parse_name(bytes)?;
+        if let Ok((new_bytes, human_desc)) = HumanMetadata::parse_description(bytes) {
+            bytes = new_bytes;
+            human.description = human_desc.description;
+        }
+        if let Ok((new_bytes, human_desc)) = HumanMetadata::parse_website_link(bytes) {
+            bytes = new_bytes;
+            human.website_link = human_desc.website_link;
+        }
         Ok((bytes, human))
     }
 }
 
 impl std::fmt::Display for HumanMetadata {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Human metadata section: ")?;
-        write_bytes(&self.metadata, f)?;
+        writeln!(f, "Human metadata section: ")?;
         if let Some(name) = self.name.as_ref() {
             writeln!(f, "Name: {name}")?;
         }
         if let Some(description) = self.description.as_ref() {
             writeln!(f, "Description: {description}")?;
+        }
+        if let Some(website_link) = self.website_link.as_ref() {
+            writeln!(f, "Website link: {website_link}")?;
         }
         Ok(())
     }

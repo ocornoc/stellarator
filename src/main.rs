@@ -11,9 +11,9 @@ struct Parse {
 
 impl Parse {
     fn print_file(path: &std::path::Path) {
-        println!("Data for {}:", path.to_string_lossy());
         let bytes = std::fs::read(path).unwrap();
         let parsed = stel::StelData::parse(&bytes).unwrap();
+        println!("Data for {}:", path.to_string_lossy());
         println!("{parsed}");
     }
 
