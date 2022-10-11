@@ -5,6 +5,12 @@ mod rle;
 pub const MAGIC_BYTES0: &[u8] = b"Stella BINARY ";
 pub const MAGIC_BYTES1: &[u8] = &[0xB8, 0xA5, 0xA9, 0x6A];
 
+fn parse_c_str(bytes: &[u8]) -> IResult<&[u8], String> {
+    let (bytes, s) = take_till(|byte| byte == 0x00)(bytes)?;
+    let (bytes, _) = tag(&[0x00])(bytes)?;
+    Ok((bytes, String::from_utf8_lossy(s).to_string()))
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct HumanMetadata {
     pub metadata: Vec<u8>,
@@ -15,17 +21,13 @@ pub struct HumanMetadata {
 impl HumanMetadata {
     fn parse_name_only(bytes: &[u8]) -> IResult<&[u8], Self> {
         let (bytes, metadata) = tag(&[0x00])(bytes)?;
-        let (bytes, name) = take_till(|byte| byte == 0x00)(bytes)?;
-        let (bytes, _) = tag(&[0x00])(bytes)?;
+        let (bytes, name) = parse_c_str(bytes)?;
         Ok((bytes, HumanMetadata {
             metadata: metadata.to_vec(),
-            name: {
-                let name = String::from_utf8_lossy(name).to_string();
-                if name.is_empty() {
-                    None
-                } else {
-                    Some(name)
-                }
+            name: if name.is_empty() {
+                None
+            } else {
+                Some(name)
             },
             description: None,
         }))
@@ -33,18 +35,14 @@ impl HumanMetadata {
 
     fn parse_description_only(bytes: &[u8]) -> IResult<&[u8], Self> {
         let (bytes, _) = tag(&[0x37, 0x00])(bytes)?;
-        let (bytes, description) = take_till(|byte| byte == 0x00)(bytes)?;
-        let (bytes, _) = tag(&[0x00])(bytes)?;
+        let (bytes, description) = parse_c_str(bytes)?;
         Ok((bytes, HumanMetadata {
             metadata: Vec::new(),
             name: None,
-            description: {
-                let description = String::from_utf8_lossy(description).to_string();
-                if description.is_empty() {
-                    None
-                } else {
-                    Some(description)
-                }
+            description: if description.is_empty() {
+                None
+            } else {
+                Some(description)
             },
         }))
     }
