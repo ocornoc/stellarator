@@ -15,6 +15,7 @@ fn parse_c_str(bytes: &[u8]) -> IResult<&[u8], String> {
 pub struct HumanMetadata {
     pub name: Option<String>,
     pub description: Option<String>,
+    pub field3a: Option<String>,
     pub website_link: Option<String>,
 }
 
@@ -45,6 +46,14 @@ impl HumanMetadata {
         }))
     }
 
+    fn parse_field3a(bytes: &[u8]) -> IResult<&[u8], Self> {
+        let (bytes, field3a) = HumanMetadata::parse_tagged_string(&[0x3A, 0x00])(bytes)?;
+        Ok((bytes, HumanMetadata {
+            field3a: Some(field3a),
+            ..Default::default()
+        }))
+    }
+
     fn parse_website_link(bytes: &[u8]) -> IResult<&[u8], Self> {
         let (bytes, website_link) = HumanMetadata::parse_tagged_string(&[0x8E, 0x00])(bytes)?;
         Ok((bytes, HumanMetadata {
@@ -55,13 +64,17 @@ impl HumanMetadata {
 
     fn parse(bytes: &[u8]) -> IResult<&[u8], Self> {
         let (mut bytes, mut human) = HumanMetadata::parse_name(bytes)?;
-        if let Ok((new_bytes, human_desc)) = HumanMetadata::parse_description(bytes) {
+        if let Ok((new_bytes, new_human)) = HumanMetadata::parse_description(bytes) {
             bytes = new_bytes;
-            human.description = human_desc.description;
+            human.description = new_human.description;
         }
-        if let Ok((new_bytes, human_desc)) = HumanMetadata::parse_website_link(bytes) {
+        if let Ok((new_bytes, new_human)) = HumanMetadata::parse_field3a(bytes) {
             bytes = new_bytes;
-            human.website_link = human_desc.website_link;
+            human.field3a = new_human.field3a;
+        }
+        if let Ok((new_bytes, new_human)) = HumanMetadata::parse_website_link(bytes) {
+            bytes = new_bytes;
+            human.website_link = new_human.website_link;
         }
         Ok((bytes, human))
     }
@@ -75,6 +88,9 @@ impl std::fmt::Display for HumanMetadata {
         }
         if let Some(description) = self.description.as_ref() {
             writeln!(f, "Description: {description}")?;
+        }
+        if let Some(field3a) = self.field3a.as_ref() {
+            writeln!(f, "Field 3A: {field3a}")?;
         }
         if let Some(website_link) = self.website_link.as_ref() {
             writeln!(f, "Website link: {website_link}")?;
